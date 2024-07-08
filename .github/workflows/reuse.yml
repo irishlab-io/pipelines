@@ -5,11 +5,11 @@ on: # yamllint disable-line rule:truthy
   workflow_call:
 
 jobs:
-  example_job:
-    name: Generate output
+  reusable_workflow:
+    name: Reusable workflow
     runs-on: ubuntu-22.04
     timeout-minutes: 5
 
     steps:
-      - id: step1
+      - name: Hello World
         run: echo "hello world"
