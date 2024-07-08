@@ -12,4 +12,4 @@ jobs:
 
     steps:
       - id: step1
-        run: echo "hello world - ${{ secrets.GITGUARDIAN_API_KEY }}"
+        run: echo "hello world"
