@@ -157,7 +157,6 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           push: ${{ inputs.push }}
-          outputs: type=image,name=target,annotation-index.org.opencontainers.image.description=${{ steps.docker_meta.outputs.tags }}
           tags: ${{ steps.docker_meta.outputs.tags }}
           labels: ${{ steps.docker_meta.outputs.labels }}
           # add attestations for provenance and sbom (bleeding edge BuildKit features)
