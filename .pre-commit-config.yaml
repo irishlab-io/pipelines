@@ -1,8 +1,10 @@
 ---
 fail_fast: false
 ci:
-  skip: [ggshield]
   autoupdate_schedule: monthly
+  skip:
+    - actionlint
+    - ggshield
 repos:
   - repo: https://github.com/gitguardian/ggshield
     rev: v1.29.0
