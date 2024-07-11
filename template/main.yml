@@ -1,0 +1,25 @@
+---
+name: Continous Integration - Main
+
+on: # yamllint disable-line rule:truthy
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - 'README.md'
+  pull_request:
+    paths-ignore:
+      - 'README.md'
+
+concurrency:
+  group: ${{ github.ref }}-${{ github.workflow }}
+  cancel-in-progress: true
+
+jobs:
+  hello-world:
+    name: Call Hello World
+    uses: irishlab-io/pipelines/.github/workflows/reusable-hello-world.yml@main
+
+  pre-commit:
+    name: Call Pre-Commit
+    uses: irishlab-io/pipelines/.github/workflows/reusable-pre-commit.yml@main
