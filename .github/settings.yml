@@ -52,8 +52,6 @@ rulesets:
     conditions:
       ref_name:
         include: ["~DEFAULT_BRANCH"]
-
-    # Refer to https://docs.github.com/en/rest/orgs/rules#create-an-organization-repository-ruleset
     rules:
       - type: deletion
       - type: pull_request
@@ -61,7 +59,7 @@ rulesets:
           dismiss_stale_reviews_on_push: false
           require_code_owner_review: false
           require_last_push_approval: false
-          required_approving_review_count: 0
+          required_approving_review_count: 1
           required_review_thread_resolution: false
       - type: required_linear_history
       - type: required_signatures
