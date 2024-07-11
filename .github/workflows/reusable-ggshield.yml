@@ -1,3 +1,4 @@
+---
 name: Reusable - Run GitGuardian scan
 
 on: # yamllint disable-line rule:truthy
