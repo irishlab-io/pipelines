@@ -51,33 +51,11 @@ rulesets:
     enforcement: active
     conditions:
       ref_name:
-        # Array of ref names or patterns to include. One of these
-        # patterns must match for the condition to pass. Also accepts
-        # `~DEFAULT_BRANCH` to include the default branch or `~ALL` to
-        # include all branches.
         include: ["~DEFAULT_BRANCH"]
-
-        # Array of ref names or patterns to exclude. The condition
-        # will not pass if any of these patterns match.
-        exclude: ["refs/heads/oldmaster"]
-
-      # This condition only exists at the org level (remove for suborg and repo level rulesets)
-      repository_name:
-        # Array of repository names or patterns to include.
-        # One of these patterns must match for the condition
-        # to pass. Also accepts `~ALL` to include all
-        # repositories.
-        include: ["test*"]
-        # Array of repository names or patterns to exclude. The
-        # condition will not pass if any of these patterns
-        # match.
-        exclude: ["test", "test1"]
-        # Whether renaming of target repositories is
-        # prevented.
-        protected: true
 
     # Refer to https://docs.github.com/en/rest/orgs/rules#create-an-organization-repository-ruleset
     rules:
+      - type: deletion
       - type: pull_request
         parameters:
           dismiss_stale_reviews_on_push: true
@@ -85,10 +63,4 @@ rulesets:
           require_last_push_approval: true
           required_approving_review_count: 1
           required_review_thread_resolution: true
-
-      - type: workflows
-        parameters:
-          workflows:
-            - path: .github/workflows/main.yml
-              repository_id: 810460984
-              ref: refs/heads/main
+      - type: required_signatures
