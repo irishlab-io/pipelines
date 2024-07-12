@@ -15,7 +15,6 @@ on: # yamllint disable-line rule:truthy
   # - Defaults to only linux/amd64 platform builds, but can build for others in parallel
 
   workflow_call:
-    # allow reuse of this workflow in other repos
     inputs:
       comment-enable:
         description: Create a PR comment with image tags and labels
@@ -24,7 +23,6 @@ on: # yamllint disable-line rule:truthy
         type: boolean
       context:
         description: Docker context (path) to start build from
-        # To set to a subdir, use format of "{{defaultContext}}:mysubdir"
         required: false
         type: string
       file:
@@ -32,12 +30,9 @@ on: # yamllint disable-line rule:truthy
         required: false
         type: string
       flavor-rules:
-        # https://github.com/marketplace/actions/docker-metadata-action#flavor-input
         description: Three rules to (optionally) set for tag-rules, latest, prefix, and suffix
         required: false
         type: string
-        # will tag latest on a git tag push, or if you add a type=semver or type=match tag-rules
-        # NOTE: if you are seeing `latest` retagged when you don't expect it, set this latest=false
         default: |
             latest=auto
       ghcr-enable:
@@ -49,15 +44,12 @@ on: # yamllint disable-line rule:truthy
         description: A list of the account/repo names for docker build to push to
         required: false
         type: string
-        # this is cool because you can add multiple names to different registries
-        # and docker-build-push step will push to all of them
         default: |
           ghcr.io/${{ github.repository }}
       platforms:
         description: Platforms to build for
         required: false
         type: string
-        # common ones: linux/amd64,linux/arm64,linux/arm/v7
         default: linux/amd64
       push:
         description: Push image to registry(s)
@@ -65,24 +57,15 @@ on: # yamllint disable-line rule:truthy
         type: boolean
         default: true
       tag-rules:
-        # https://github.com/marketplace/actions/docker-metadata-action#tags-input
         description: Use docker-metadata action to create tags from a key-value pair list in CSV format
         required: false
         type: string
-        # this ruleset will create one or more tags for each image in image-names
-        # some fire in pr-only, some in push/merge-only
-        # I still recommend reusable `latest` tag for human-friendly testing (not servers)
-        # I like a full tag for prod images that reads something like `stable-<date>-<commit>`
-        # Tags starting with `gha-<run_id>` are unique to each PR commit, and used to test fresh images      # rules with is_default_branch only create the tag if it's a push/merge to default branch
-        # priority attribute is used to sort tags in the final list. The higher the value,
-        #   the higher the priority. The first tag in the list (higher priority) will be used as
-        #   the image version for generated OCI label and version output.
         default: |
-          type=raw,value=stable-{{date 'YYYYMMDD'}}-{{sha}},enable={{is_default_branch}},priority=300
-          type=ref,event=tag,priority=200
-          type=raw,value=latest,enable={{is_default_branch}},priority=100
           type=raw,value=gha-${{ github.run_id }},enable=${{github.event_name == 'pull_request'}},priority=200
+          type=raw,value=latest,enable={{is_default_branch}},priority=100
+          type=raw,value=stable-{{date 'YYYYMMDD'}}-{{sha}},enable={{is_default_branch}},priority=300
           type=ref,event=pr,priority=100
+          type=ref,event=tag,priority=200
       target:
         description: Build stage to target
         required: false
@@ -91,98 +74,16 @@ on: # yamllint disable-line rule:truthy
     outputs:
       image-tag:
         description: "single-use image tag for GHA runs"
-        value: ${{ jobs.build-image.outputs.image-tag }}
-
-# set permissions here for what's required to run this Reusable Workflow
-# However, permisions are set in the GITHUB_TOKEN by the **calling** workflow
-# Calling permissions must be equal to or greater than these reusable permissions for it to work
-# https://docs.github.com/en/actions/using-workflows/reusing-workflows#supported-keywords-for-jobs-that-call-a-reusable-workflow
+        value: ${{ jobs.docker-build-push.outputs.image-tag }}
 
 permissions:
   contents: read
-  packages: write # needed to push docker image to ghcr.io
-  pull-requests: write # needed to create and update comments in PRs
+  packages: write
+  pull-requests: write
 
 jobs:
 
-  build-test-image:
-    name: Build Image for Testing & Scanning
-    runs-on: ubuntu-latest
-
-    permissions:
-      contents: read
-      packages: write
-
-    steps:
-
-      - name: Checkout git repo
-        uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Login to ghcr.io registry
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build and Push to GHCR
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          push: true
-          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.run_id }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          platforms: linux/amd64
-
-  scan-image:
-    name: Scan Image with Trivy
-    needs: [build-test-image]
-    runs-on: ubuntu-latest
-
-    permissions:
-      contents: read
-      packages: read
-      security-events: write
-
-    steps:
-
-      - name: Checkout git repo
-        uses: actions/checkout@v4
-
-      - name: Login to ghcr.io registry
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Pull image to scan
-        run: |
-          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:"$GITHUB_RUN_ID"
-
-      - name: Run Trivy for HIGH,CRITICAL CVEs and report (blocking)
-        uses: aquasecurity/trivy-action@master
-        with:
-          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.run_id }}
-          exit-code: 0
-          ignore-unfixed: true
-          vuln-type: 'os,library'
-          severity: 'HIGH,CRITICAL'
-          format: 'sarif'
-          output: 'results.sarif'
-
-      - name: Upload Trivy scan results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: results.sarif
-          category: results
-
-  build-image:
+  docker-build-push:
 
     name: Docker - Build & Push
     runs-on: ubuntu-22.04
@@ -192,6 +93,9 @@ jobs:
       image-tag: ${{ steps.image-tag.outputs.image-tag }}
 
     steps:
+
+      - name: Checkout
+        uses: actions/checkout@v4.1.7
 
       - name: Set up QEMU
         id: qemu
@@ -231,14 +135,9 @@ jobs:
           push: ${{ inputs.push }}
           tags: ${{ steps.docker_meta.outputs.tags }}
           labels: ${{ steps.docker_meta.outputs.labels }}
-          # add attestations for provenance and sbom (bleeding edge BuildKit features)
-          # NOTE: for now, this reults in `unknown/unknown` images in all registries but Hub
-          # https://docs.docker.com/build/attestations/attestation-storage/
           provenance: true
           sbom: true
 
-        # If PR, put image tags in the PR comments
-        # from https://github.com/marketplace/actions/create-or-update-comment
       - name: Find comment for image tags
         uses: peter-evans/find-comment@v3.1.0
         if: github.event_name == 'pull_request' && inputs.comment-enable
@@ -248,7 +147,6 @@ jobs:
           comment-author: 'github-actions[bot]'
           body-includes: Docker image tag(s) pushed
 
-        # If PR, put image tags in the PR comments
       - name: Create or update comment for image tags
         uses: peter-evans/create-or-update-comment@v4.0.0
         if: github.event_name == 'pull_request' && inputs.comment-enable
@@ -267,11 +165,6 @@ jobs:
             ```
           edit-mode: replace
 
-        # for dependent jobs, we need to output the unique tag for this GHA run
-        # based on the docker_meta tag priority rules, the highest priority tag
-        # will be sent to this output
-        # this step output is sent to job output, which is sent to workflow output
-        # use this tag in another job with needs.<job-name>.outputs.image-tag
       - name: Find the primary image tag we just pushed, and output it
         id: image-tag
         run: |
