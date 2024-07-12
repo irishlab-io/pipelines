@@ -77,7 +77,9 @@ on: # yamllint disable-line rule:truthy
         value: ${{ jobs.docker-build-push.outputs.image-tag }}
 
 permissions:
+  attestations: write
   contents: read
+  id-token: write
   packages: write
   pull-requests: write
 
@@ -143,7 +145,7 @@ jobs:
         id: attest
         with:
           subject-name: ${{ inputs.image-names }}
-          subject-digest: ${{ steps.push.outputs.digest }}
+          subject-digest: ${{ steps.build_image.outputs.digest }}
           push-to-registry: true
 
       - name: Find comment for image tags
